@@ -18,6 +18,7 @@ const ST_CUSTCREDIT = 11;
 const ST_CUSTDELIVERY = 13;
 const ST_SALESORDER = 30;
 const ST_SALESQUOTE = 32;
+const ST_SUPPINVOICE = 20;
 const PT_MISC = 0;
 const PT_CUSTOMER = 2;
 const PT_SUPPLIER = 3;
@@ -261,6 +262,117 @@ class Cart
      * @param string|null $description
      */
     public function add_to_cart($line_no, $stock_id, $qty, $price, $disc, $qty_done = 0, $standard_cost = 0, $description = null, $id = 0, $src_no = 0, $src_id = 0): int {}
+}
+
+/**
+ * One line of a purchase order / supplier invoice.
+ */
+class po_line_details
+{
+    /** @var int */
+    public $line_no;
+    /** @var string */
+    public $stock_id = '';
+    /** @var string */
+    public $item_description = '';
+    /** @var float */
+    public $quantity = 0.0;
+    /** @var float */
+    public $price = 0.0;
+    /** @var string */
+    public $units = '';
+    /** @var string */
+    public $req_del_date = '';
+    /** @var float */
+    public $qty_inv = 0.0;
+    /** @var float */
+    public $qty_recd = 0.0;
+    /** @var int */
+    public $grn_item_id = 0;
+    /** @var int */
+    public $cogs = 0;
+}
+
+/**
+ * The purchase order the supplier invoice is built from.
+ */
+class purch_order
+{
+    /** @var int */
+    public $trans_type = 0;
+    /** @var int */
+    public $trans_no = 0;
+    /** @var array<int, po_line_details> */
+    public $line_items = array();
+    /** @var string */
+    public $curr_code = '';
+    /** @var string */
+    public $supp_ref = '';
+    /** @var string */
+    public $delivery_address = '';
+    /** @var string */
+    public $Comments = '';
+    /** @var string */
+    public $Location = '';
+    /** @var string|int */
+    public $supplier_id = 0;
+    /** @var string */
+    public $supplier_name = '';
+    /** @var string */
+    public $orig_order_date = '';
+    /** @var string */
+    public $due_date = '';
+    /** @var int */
+    public $order_no = 0;
+    /** @var int */
+    public $lines_on_order = 0;
+    /** @var float */
+    public $credit = 0.0;
+    /** @var int */
+    public $tax_group_id = 0;
+    /** @var array<int, array<string, mixed>>|null */
+    public $tax_group_array = null;
+    /** @var int */
+    public $tax_included = 0;
+    /** @var array<string, mixed> */
+    public $terms = array();
+    /** @var float */
+    public $ex_rate = 0.0;
+    /** @var string */
+    public $cash_account = '';
+    /** @var string|int */
+    public $dimension = 0;
+    /** @var string|int */
+    public $dimension2 = 0;
+    /** @var string */
+    public $reference = '';
+    /** @var array<int, mixed> */
+    public $tax_overrides = array();
+    /** @var float */
+    public $prep_amount = 0.0;
+    /** @var float */
+    public $alloc = 0.0;
+    /** @var array<int, mixed> */
+    public $prepayments = array();
+    /** @var bool */
+    public $fixed_asset = false;
+
+    /**
+     * @param int $line_no
+     * @param string $stock_id
+     * @param float|int|string $qty
+     * @param string $item_descr
+     * @param float|int|string $price
+     * @param string $uom
+     * @param string $req_del_date
+     * @param float|int|string $qty_inv
+     * @param float|int|string $qty_recd
+     * @param int $grn_item_id
+     * @param int $cogs
+     */
+    public function add_to_order($line_no, $stock_id, $qty, $item_descr, $price, $uom, $req_del_date, $qty_inv, $qty_recd, $grn_item_id = 0, $cogs = 0) {}
+
+    public function reprice_order(): void {}
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -723,3 +835,86 @@ function floatcmp($a, $b): int {}
  * @param int $trans_type
  */
 function get_next_trans_no($trans_type): int|float {}
+
+// ---------------------------------------------------------------------------------------------
+// Purchasing: the direct supplier invoice
+// ---------------------------------------------------------------------------------------------
+/**
+ * The supplier of an invoice.
+ *
+ * @param string|int $supplier_id
+ * @return array<string, mixed>|false
+ */
+function get_supplier($supplier_id) {}
+
+/**
+ * The stock item of an invoice line.
+ *
+ * @param string $stock_id
+ * @return array<string, mixed>|false
+ */
+function get_item($stock_id) {}
+
+/**
+ * The stock location of an invoice.
+ *
+ * @param string $item_location
+ * @return array<string, mixed>|false
+ */
+function get_item_location($item_location) {}
+
+/**
+ * Every stock location of the company.
+ *
+ * @param bool $show_inactive
+ * @param int $fixed_asset
+ * @return mysqli_result
+ */
+function get_item_locations($show_inactive, $fixed_asset = 0) {}
+
+/**
+ * Fills the supplier, currency, tax group and payment terms of the purchase order.
+ *
+ * @param purch_order $order
+ * @param string|int $supplier_id
+ */
+function get_supplier_details_to_order(&$order, $supplier_id) {}
+
+/**
+ * The due date the payment terms of the supplier give.
+ *
+ * @param purch_order $trans
+ */
+function get_duedate_from_terms(&$trans) {}
+
+/**
+ * Writes the purchase order, the goods received and the supplier invoice.
+ *
+ * @param purch_order $cart
+ * @return int the number of the supplier invoice, 0 when it could not be written
+ */
+function add_direct_supp_trans($cart) {}
+
+/**
+ * Whether the supplier already has an invoice with this number.
+ *
+ * @param string|int $supplier_id
+ * @param string $supp_reference
+ * @param int $trans_no
+ */
+function is_reference_already_there($supplier_id, $supp_reference, $trans_no = 0) {}
+
+/**
+ * The last day of the month the date is in.
+ *
+ * @param string $date
+ */
+function end_month($date) {}
+
+/**
+ * The date the given number of days later, negative numbers count backwards.
+ *
+ * @param string $date
+ * @param int $days
+ */
+function add_days($date, $days) {}

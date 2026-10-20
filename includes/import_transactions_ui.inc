@@ -40,7 +40,8 @@ function import_type_list_row(string $label, string $name, string $selected): vo
 {
     $arr = array(ST_JOURNAL=> _("General Journal Processing"),
         ST_BANKDEPOSIT=> _("Deposit Processing"),
-        ST_BANKPAYMENT=> _("Payment Processing"),ST_SALESORDER=>_("Sales Order Processing"),ST_SALESINVOICE=> _("Direct Sales Invoice Processing ")
+        ST_BANKPAYMENT=> _("Payment Processing"),ST_SALESORDER=>_("Sales Order Processing"),ST_SALESINVOICE=> _("Direct Sales Invoice Processing "),
+        ST_SUPPINVOICE=> _("Direct Supplier Invoice Processing ")
     );
     echo "<tr><td class='label' colspan=1>$label</td><td>";
     echo array_selector($name, $selected, $arr,
@@ -71,7 +72,7 @@ function initialize_main_controls(): void
         if (!isset($_POST[$field])) $_POST[$field] = '';
     }
     if (!isset($_POST['sep'])) $_POST['sep'] = ",";
-    if (!isset($_POST['bank_account'])) $_POST['bank_account'] = _("Current account");
+    if (!isset($_POST['bank_account'])) $_POST['bank_account'] = import_default_bank_account();
     if (!isset($_POST['trial'])) $_POST['trial'] = '1';
 }
 
@@ -188,6 +189,10 @@ function show_table_section_notes(int $type): void
     {
         show_table_section_sales_notes();
     }
+    if ($type == ST_SUPPINVOICE)
+    {
+        show_table_section_supplier_invoice_notes();
+    }
 }
 
 function show_table_section_sales_notes(): void
@@ -202,6 +207,19 @@ function show_table_section_sales_notes(): void
     label_row(_("7. Ensure that you have a delivery address completed."),"",'colspan=1');
     label_row(_("8. Sales orders and delivery notes are automatically created if 'Direct Sales Invoice Processing' is selected."),"",'colspan=1');
     label_row(_("9. If the Payment id column has a value of 4 in it, ie. Cash Only,  this will automatically allocate a Customer Payment to the invoice from the Petty Cash Account."),"",'colspan=1');
+}
+
+function show_table_section_supplier_invoice_notes(): void
+{
+    table_section_title(_("Display Help Notes: Important regarding Importing Supplier Invoices"),2);
+    label_row(_("1. Use Template: <a href='./templates/supplier_invoice.csv'>supplier_invoice.csv</a> to import supplier invoices from other packages."),"",'colspan=1');
+    label_row(_("2. The invoices created are the same documents as the ones created with Purchasing -> Purchase Orders -> Direct Purchase Invoice Entry."),"",'colspan=1');
+    label_row(_("3. The reference column defines the start and finish of a supplier invoice in the spreadsheet, it has to match the pattern in Setup->Transaction References. Use '+' for every further line of the same invoice."),"",'colspan=1');
+    label_row(_("4. The supplier's own invoice number (supp_ref) is required and has to be unique for the supplier."),"",'colspan=1');
+    label_row(_("5. The invoice date has to be within the current fiscal year, the due date is taken from the supplier payment terms unless it is given in the csv."),"",'colspan=1');
+    label_row(_("6. The tax is calculated from the tax group of the supplier and the tax type of the item."),"",'colspan=1');
+    label_row(_("7. Ensure that your item_code, eg. 001, for Services in your spreadsheet has a 'Text' column format otherwise you will lose your leading zeros when saving your to csv."),"",'colspan=1');
+    label_row(_("8. Ensure that your csv file date format includes a 4 number year ie. YYYY, and it complies with your User selected date format."),"",'colspan=1');
 }
 
 function show_table_section_sales(): void

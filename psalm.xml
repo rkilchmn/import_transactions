@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<psalm errorLevel="1" phpVersion="8.5" findUnusedBaselineEntry="false" findUnusedCode="false">
+<psalm errorLevel="1" phpVersion="8.4" findUnusedBaselineEntry="false" findUnusedCode="false">
     <fileExtensions>
         <extension name=".php"/>
         <extension name=".inc"/>

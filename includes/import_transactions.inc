@@ -326,6 +326,18 @@ function supplier_name(string $person_id): string
     return $row === false ? '' : (string)$row['supp_name'];
 }
 
+/**
+ * The bank account the form shows when nothing was posted: the first bank account of the company.
+ */
+function import_default_bank_account(): string
+{
+    $sql = "SELECT id FROM ".TB_PREF."bank_accounts WHERE inactive=0 ORDER BY id";
+    $result = db_query($sql, "could not read the bank accounts");
+    $row = db_fetch($result);
+
+    return $row === false ? '' : (string)$row['id'];
+}
+
 //if taxtype > 0 separate into inclusive, exclusive, and tax in preparation for gl split
 function determinetax(int $taxtype, float $amt): import_tax_split
 {

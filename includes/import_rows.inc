@@ -144,3 +144,47 @@ final class import_sales_line
 		return $row;
 	}
 }
+
+/**
+ * A direct supplier invoice line.
+ */
+final class import_supplier_line
+{
+	public string $supplier_id = '';
+	public string $reference = '';
+	public string $supp_ref = '';
+	public string $date = '';
+	public string $due_date = '';
+	public string $item_code = '';
+	public string $item_description = '';
+	public string $quantity = '';
+	public string $price = '';
+	public string $location = '';
+	public string $dimension_id = '';
+	public string $dimension2_id = '';
+	public string $comments = '';
+	public string $summary = '';
+
+	/**
+	 * @param array<int, string|null> $data one CSV record
+	 */
+	public static function fromCsv(array $data): self
+	{
+		$row = new self();
+		$row->supplier_id = import_cell($data, 0);
+		$row->reference = import_cell($data, 1);
+		$row->supp_ref = import_cell($data, 2);
+		$row->date = import_cell($data, 3);
+		$row->due_date = import_cell($data, 4);
+		$row->item_code = import_cell($data, 5);
+		$row->item_description = import_cell($data, 6);
+		$row->quantity = import_cell($data, 7);
+		$row->price = import_cell($data, 8);
+		$row->location = import_cell($data, 9);
+		$row->dimension_id = import_cell($data, 10);
+		$row->dimension2_id = import_cell($data, 11);
+		$row->comments = import_cell($data, 12);
+		$row->summary = implode(', ', array_map('strval', $data));
+		return $row;
+	}
+}

@@ -54,6 +54,7 @@ include_once(__DIR__ . "/includes/import_transactions_ui.inc"); //the form
 include_once(__DIR__ . "/includes/import_sales_order_entry.inc"); // adaptation of sales_order_entry.php
 include_once(__DIR__ . "/includes/import_sales_cart_class.inc"); // adaptation of cart class
 include_once(__DIR__ . "/includes/import_sales_order_ui.inc"); // adaptation of sales_order_ui.inc
+include_once(__DIR__ . "/includes/import_supplier_invoice.inc"); // direct supplier invoice import
 
 add_access_extensions();
 
@@ -114,7 +115,9 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
     $isSales = ($type == ST_SALESORDER) || ($type == ST_SALESINVOICE);
     $isGl = ($type == ST_BANKDEPOSIT) || ($type == ST_BANKPAYMENT) || ($type == ST_JOURNAL);
     $isBank = ($type == ST_BANKDEPOSIT) || ($type == ST_BANKPAYMENT);
+    $isSupplier = ($type == ST_SUPPINVOICE);
     $cart = null;
+    $supplier_state = new import_supplier_state();
     $error = false;
     $reference = '';
     $date = '';
@@ -132,11 +135,25 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
 
         $l = null;
         $s = null;
-        if ($isSales)
+        $sup = null;
+        if ($isSupplier)
+        {
+            $sup = import_supplier_line::fromCsv($data);
+            $reference = $sup->reference;
+            $date = $sup->date;
+        }
+        elseif ($isSales)
         {
             $s = import_sales_line::fromCsv($data);
             $reference = $s->reference;
             $date = $s->date;
+            // a '+' in the reference column continues the document of the previous line, it has
+            // to be resolved before the document boundaries are checked
+            if ($reference === '+')
+            {
+                $reference = $prev_ref === null ? '' : $prev_ref;
+                $s->reference = $reference;
+            }
         }
         else
         {
@@ -163,7 +180,8 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
         if ($s !== null)
         {
             display_notification_centered(_("Processing line $line ({$s->summary}) in import file '$file')"));
-            if (!customer_exist($s->customer_id)) {
+            $customer_exists = customer_exist($s->customer_id);
+            if (!$customer_exists) {
                 display_notification("Customer does not exist in the database");
                 $error = true;
             }
@@ -184,7 +202,9 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
             {
                 $docline = $docline + 1;
             }
-            $com = get_customer_details_to_order($cart, $s->customer_id, $s->branch_no);
+            // the customer details are only fetched for an existing customer, otherwise the
+            // lookup of the application would fail on an empty record
+            $com = $customer_exists ? get_customer_details_to_order($cart, $s->customer_id, $s->branch_no) : _("Customer does not exist in the database");
             display_notification_centered($com);
             if ($com != "")
             {
@@ -202,6 +222,18 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
                 display_notification_centered("Error");
                 $error = true;
             }
+        }
+
+        if ($sup !== null)
+        {
+            // a supplier invoice is a complete document, it has its own reference handling and
+            // its own document boundaries, so the generic code below does not apply to it
+            display_notification_centered(_("Processing line $line ({$sup->summary}) in import file '$file')"));
+            if (import_supplier_invoice_line($sup, $line, $supplier_state)) {
+                $run->errCnt = $run->errCnt + 1;
+            }
+            $run->entryCount = $run->entryCount + 1;
+            continue;
         }
 
         if (($prev_ref !== $reference) && ($type < 4)) {
@@ -255,7 +287,11 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
             display_error(_("Error: Reference from table 'refs': '$reference' is already in use. (line $line in import file '$file')"));
             $error = true;
         } elseif ($reference_is_new && ($reference !== $prev_ref)) {
-            $Refs->save($type, $curEntryId, $reference);
+            // the sales and the supplier documents register their reference with the number of
+            // the document themselves, saving it here as well would register it twice
+            if (!in_array($type, array(ST_SALESORDER, ST_SALESINVOICE, ST_SUPPINVOICE), true)) {
+                $Refs->save($type, $curEntryId, $reference);
+            }
         }
 
         if (!is_date($date)) {
@@ -338,6 +374,15 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
     {
         import_write_document($cart);
     }
+
+    if ($isSupplier)
+    {
+        // the last invoice of the file is still to be written
+        if (!import_supplier_invoice_write($supplier_state)) {
+            $run->errCnt = $run->errCnt + 1;
+        }
+        $run->doc_num = $supplier_state->invoices;
+    }
 }
 
 /**
@@ -353,7 +398,15 @@ function import_process_upload(int $type): void
     $stateformat = ($type > 0) && isset($_POST['stateformat']);
     $sep = import_post('sep');
     $bank_account = import_post('bank_account');
+    if (($bank_account === '') || !is_numeric($bank_account)) {
+        // the bank account of the form was not posted, take the one the form shows
+        $bank_account = import_default_bank_account();
+    }
     $bank_account_gl_code = $bank_account !== '' ? get_bank_gl_account($bank_account) : "";
+    if ((($type == ST_BANKDEPOSIT) || ($type == ST_BANKPAYMENT)) && ($bank_account_gl_code === '')) {
+        display_error(_("Please select the bank account the transactions are imported into."));
+        return;
+    }
     $fp = @fopen($filename, "r");
     if (!$fp)
     {
@@ -381,6 +434,7 @@ function import_process_upload(int $type): void
     elseif ($type == ST_BANKPAYMENT) {$typeString = "Payments";}
     elseif ($type == ST_SALESORDER) {$typeString = "Sales Order csv lines / $doc_num order(s)";}
     elseif ($type == ST_SALESINVOICE) {$typeString = "Sales Invoices csv lines / $doc_num invoice(s)";}
+    elseif ($type == ST_SUPPINVOICE) {$typeString = "Supplier Invoices csv lines / $doc_num invoice(s)";}
     else {$typeString = "";}
 
     $entryCount = $run->entryCount;
@@ -417,7 +471,7 @@ function import_transactions_page(): void
 
     $js = '';
     if ($SysPrefs->use_popup_windows) {$js .= get_js_open_window(800, 500);}
-    $help_context = "Import General Journals  / Deposits / Payments / Bank Statements / Sales Orders / Sales Invoices  <a href='spreadsheet_headers.html'>Help: Formats</a>";
+    $help_context = "Import General Journals  / Deposits / Payments / Bank Statements / Sales Orders / Sales Invoices / Supplier Invoices  <a href='spreadsheet_headers.html'>Help: Formats</a>";
     page(_($help_context), false, false, "", $js);
 
     if (isset($_POST['type']))
