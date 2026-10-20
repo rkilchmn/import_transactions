@@ -1,0 +1,4 @@
+supplier_id,reference,supp_ref,date,due_date,item_code,item_description,quantity,price,location,dimension_id,dimension2_id,comments
+1,SUP-001,INV-0001,01/12/2024,,001,Widget,2,10.50,DEF,,,Order for December
+1,SUP-001,INV-0001,01/12/2024,,002,Gadget,1,25.00,DEF,,,
+2,SUP-002,INV-0002,01/12/2024,15/01/2025,001,Widget,5,9.75,DEF,,,Second supplier invoice
