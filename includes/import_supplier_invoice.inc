@@ -203,12 +203,25 @@ function import_supplier_invoice_line(import_supplier_line $row, int $line, impo
 		'supplier' => $row->supplier_id,
 	);
 
-	// resolve the document reference
+	// resolve the document reference: '+' continues the current invoice,
+	// a blank cell lets get_next() assign the next free reference
 	$reference = $row->reference;
+	if ($reference === '+') {
+		$reference = $state->reference;
+	}
+
+	// a new invoice starts when the supplier or its invoice number changes
+	$new_invoice = ($state->cart !== null)
+		&& (($state->supplier_id !== $row->supplier_id) || ($state->supp_ref !== $row->supp_ref));
+
+	// write the previous invoice before resolving the new auto-reference, so that
+	// get_next() sees the just-written reference and the sequence advances
+	if ($new_invoice && !import_supplier_invoice_write($state)) {
+		return true;
+	}
+
 	if ($reference === '') {
 		$reference = $Refs->get_next(ST_SUPPINVOICE, null, $context);
-	} elseif ($reference === '+') {
-		$reference = $state->reference;
 	}
 
 	if (!$Refs->is_valid($reference, ST_SUPPINVOICE, $context)) {
@@ -220,20 +233,7 @@ function import_supplier_invoice_line(import_supplier_line $row, int $line, impo
 		return true;
 	}
 
-	// the reference changed, so the previous invoice is complete
-	if (($state->cart !== null) && ($reference !== $state->reference)) {
-		if (!import_supplier_invoice_write($state)) {
-			return true;
-		}
-	}
-
-	if (($state->cart !== null) && ($reference === $state->reference)) {
-		// the same invoice, the supplier and its invoice number have to stay the same
-		if (($state->supplier_id !== $row->supplier_id) || ($state->supp_ref !== $row->supp_ref)) {
-			display_error(sprintf(_("Error on line %d: The supplier and the supplier's invoice reference have to be the same for all lines of an invoice"), $line));
-			return true;
-		}
-	} else {
+	if ($new_invoice || $state->cart === null) {
 		$state->cart = import_supplier_invoice_cart($row);
 		$state->reference = $reference;
 		$state->supplier_id = $row->supplier_id;
