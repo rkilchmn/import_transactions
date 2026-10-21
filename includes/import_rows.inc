@@ -108,6 +108,8 @@ final class import_sales_line
 	public string $custref = '';
 	public string $shipvia = '';
 	public string $comments = '';
+	// the name of the document that is attached to the invoice
+	public string $attachment = '';
 	// the csv also carries freightcost (col 15) and ex_rate (col 25); the importer has always ignored both
 	public string $summary = '';
 
@@ -140,6 +142,7 @@ final class import_sales_line
 		$row->custref = import_cell($data, 21);
 		$row->shipvia = import_cell($data, 22);
 		$row->comments = import_cell($data, 23);
+		$row->attachment = import_cell($data, 25);
 		$row->summary = implode(', ', array_map('strval', $data));
 		return $row;
 	}
@@ -163,6 +166,8 @@ final class import_supplier_line
 	public string $dimension_id = '';
 	public string $dimension2_id = '';
 	public string $comments = '';
+	// the name of the document that is attached to the invoice
+	public string $attachment = '';
 	public string $summary = '';
 
 	/**
@@ -184,6 +189,7 @@ final class import_supplier_line
 		$row->dimension_id = import_cell($data, 10);
 		$row->dimension2_id = import_cell($data, 11);
 		$row->comments = import_cell($data, 12);
+		$row->attachment = import_cell($data, 13);
 		$row->summary = implode(', ', array_map('strval', $data));
 		return $row;
 	}

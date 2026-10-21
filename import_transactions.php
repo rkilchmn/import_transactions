@@ -55,6 +55,7 @@ include_once(__DIR__ . "/includes/import_sales_order_entry.inc"); // adaptation 
 include_once(__DIR__ . "/includes/import_sales_cart_class.inc"); // adaptation of cart class
 include_once(__DIR__ . "/includes/import_sales_order_ui.inc"); // adaptation of sales_order_ui.inc
 include_once(__DIR__ . "/includes/import_supplier_invoice.inc"); // direct supplier invoice import
+include_once(__DIR__ . "/includes/import_attachments.inc"); // documents attached to the imported transactions
 
 add_access_extensions();
 
@@ -79,14 +80,26 @@ final class import_run
 }
 
 /**
- * Finishes the sales order / invoice that is being collected.
+ * Finishes the sales order / invoice that is being collected and attaches its document.
+ *
+ * @return int the number of the document that was written, 0 when there was none
  */
-function import_write_document(?Cart $cart): void
+function import_write_document(?import_sales_cart $cart, int $type, import_attachment_library $library, import_run $run): int
 {
-    if ($cart !== null) {
-        $cart->write(0);
-        $cart->clear_items();
+    if ($cart === null) {
+        return 0;
     }
+    $trans_no = (int)$cart->write(0);
+    $cart->clear_items();
+    if ($trans_no > 0 && $cart->attachment !== '') {
+        $description = ($type == ST_SALESORDER)
+            ? sprintf(_("Sales order %s"), $cart->reference)
+            : sprintf(_("Sales invoice %s"), $cart->reference);
+        if (!import_attachment_attach($library, $cart->attachment, $type, $trans_no, $description)) {
+            $run->errCnt = $run->errCnt + 1;
+        }
+    }
+    return $trans_no;
 }
 
 /**
@@ -94,7 +107,7 @@ function import_write_document(?Cart $cart): void
  *
  * @param resource $fp the open csv file
  */
-function import_process_lines($fp, int $type, string $sep, bool $stateformat, string $bank_account, string $bank_account_gl_code, import_run $run): void
+function import_process_lines($fp, int $type, string $sep, bool $stateformat, string $bank_account, string $bank_account_gl_code, import_run $run, import_attachment_library $library): void
 {
     /** @var references $Refs */
     global $Refs;
@@ -189,7 +202,7 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
             {
                 if ($firstlinecopied) // if the reference has changed for line items write the preference reference based document to the cart
                 {
-                    import_write_document($cart);
+                    import_write_document($cart, $type, $library, $run);
                     $firstlinecopied = false;
                 }
                 $docline = 1; //the reference has changed so this will be the first line item.
@@ -212,6 +225,10 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
                 $error = true;
             }
             copy_to_cart($cart, $s);
+            // the document of the invoice is named in the attachment column of one of its lines
+            if ($cart->attachment === '' && $s->attachment !== '') {
+                $cart->attachment = trim($s->attachment);
+            }
             $firstlinecopied = true;
             if (!import_add_to_order($cart, $s->item_code, (float)$s->quantity, (float)$s->price, (float)$s->discountpercentage, $s->item_description)) {
                 $error = true;
@@ -229,7 +246,7 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
             // a supplier invoice is a complete document, it has its own reference handling and
             // its own document boundaries, so the generic code below does not apply to it
             display_notification_centered(_("Processing line $line ({$sup->summary}) in import file '$file')"));
-            if (import_supplier_invoice_line($sup, $line, $supplier_state)) {
+            if (import_supplier_invoice_line($sup, $line, $supplier_state, $library)) {
                 $run->errCnt = $run->errCnt + 1;
             }
             $run->entryCount = $run->entryCount + 1;
@@ -372,13 +389,13 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
 
     if ($isSales && $firstlinecopied && $prev_ref === $reference) //for the last line item in a csv
     {
-        import_write_document($cart);
+        import_write_document($cart, $type, $library, $run);
     }
 
     if ($isSupplier)
     {
         // the last invoice of the file is still to be written
-        if (!import_supplier_invoice_write($supplier_state)) {
+        if (!import_supplier_invoice_write($supplier_state, $library)) {
             $run->errCnt = $run->errCnt + 1;
         }
         $run->doc_num = $supplier_state->invoices;
@@ -419,15 +436,33 @@ function import_process_upload(int $type): void
         fclose($fp);
         return;
     }
-    begin_transaction();
-    $run = new import_run();
-    import_process_lines($fp, $type, $sep, $stateformat, $bank_account, $bank_account_gl_code, $run);
-    fclose($fp);
-
-    // Commit import to database
     $trial_text = import_post('trial');
     $trial = $trial_text !== '' && $trial_text !== '0';
 
+    // the documents that are attached to the imported transactions, they are either uploaded one
+    // by one or carried by the zip file that has the name of the csv file with the .zip extension
+    $library = new import_attachment_library(import_file_name());
+    $library->set_trial($trial);
+    foreach ($library->errors() as $problem) {
+        display_error($problem);
+    }
+    if (!$library->is_empty() && !user_check_access('SA_ATTACHDOCUMENT')) {
+        display_error(_("You do not have permission to attach documents to the imported transactions."));
+        fclose($fp);
+        return;
+    }
+    // the documents are checked before anything is written, a missing document is reported
+    // before the invoices are created and not after
+    if (import_attachment_check_csv($fp, $type, $sep, $library) > 0) {
+        fclose($fp);
+        return;
+    }
+    begin_transaction();
+    $run = new import_run();
+    import_process_lines($fp, $type, $sep, $stateformat, $bank_account, $bank_account_gl_code, $run, $library);
+    fclose($fp);
+
+    // Commit import to database
     $doc_num = $run->doc_num;
     if ($type == ST_JOURNAL) {$typeString = "General Journals";}
     elseif ($type == ST_BANKDEPOSIT) {$typeString = "Deposits";}
@@ -443,7 +478,12 @@ function import_process_upload(int $type): void
         if ($errCnt == 0) {
             if ($entryCount > 0) {
                 commit_transaction();
+                // the documents that were written belong to the transactions that were committed
+                $library->keep_written();
                 display_notification_centered(_("$entryCount $typeString have been imported."));
+                if ($library->attached_count() > 0) {
+                    display_notification_centered(sprintf(_("%d document(s) have been attached."), $library->attached_count()));
+                }
             } else display_error(_("Import file contained no $typeString."));
         }
     } else {
@@ -452,6 +492,7 @@ function import_process_upload(int $type): void
             else display_notification_centered(_("Import file contained no $typeString. Populate file with data before importing."));
         }
         if (($errCnt > 0) && $run->displayed_at_least_once) display_notification_centered(_("$errCnt error(s) detected. Correct before importing."));
+        if ($library->pending_count() > 0) display_notification_centered(sprintf(_("%d document(s) would have been attached."), $library->pending_count()));
     }
 }
 
@@ -474,7 +515,9 @@ function import_transactions_page(): void
     $help_context = "Import General Journals  / Deposits / Payments / Bank Statements / Sales Orders / Sales Invoices / Supplier Invoices  <a href='spreadsheet_headers.html'>Help: Formats</a>";
     page(_($help_context), false, false, "", $js);
 
-    if (isset($_POST['type']))
+    // the import is only run when the process button was pressed. The form is also posted when
+    // the import type is changed, the file of an earlier selection would be imported again.
+    if (find_submit('import') != -1)
     {
         import_process_upload((int)import_post('type'));
     }
@@ -496,6 +539,10 @@ function import_transactions_page(): void
     }
     show_table_section_csv_separator();
     show_table_section_trial_or_final();
+    if (in_array($type, array(ST_SUPPINVOICE, ST_SALESINVOICE, ST_SALESORDER), true)) {
+        // only the documents of the invoice imports are attached to the transactions
+        show_table_section_attachments();
+    }
     end_table(1);
     div_end('_main_table');
     submit_center('import', "Process", true, false, true, ICON_OK);

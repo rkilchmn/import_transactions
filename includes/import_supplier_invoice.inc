@@ -31,6 +31,8 @@ final class import_supplier_state
 	public string $supplier_id = '';
 	// the supplier's own invoice number of the invoice being collected
 	public string $supp_ref = '';
+	// the name of the document that is attached to the invoice
+	public string $attachment = '';
 	// invoices written
 	public int $invoices = 0;
 }
@@ -157,7 +159,7 @@ function import_supplier_invoice_add_line(purch_order $cart, import_supplier_lin
 /**
  * Writes the supplier invoice that is being collected and starts a new one.
  */
-function import_supplier_invoice_write(import_supplier_state $state): bool
+function import_supplier_invoice_write(import_supplier_state $state, import_attachment_library $library): bool
 {
 	if ($state->cart === null) {
 		return true;
@@ -169,8 +171,19 @@ function import_supplier_invoice_write(import_supplier_state $state): bool
 		return false;
 	}
 	$state->invoices++;
+	$attachment = $state->attachment;
+	$reference = $state->reference;
+	$supp_ref = $state->supp_ref;
 	$state->cart = null;
 	$state->reference = '';
+	$state->attachment = '';
+
+	if ($attachment !== '') {
+		$description = sprintf(_("Supplier invoice %s (%s)"), $reference, $supp_ref);
+		if (!import_attachment_attach($library, $attachment, ST_SUPPINVOICE, (int)$trans_no, $description)) {
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -179,7 +192,7 @@ function import_supplier_invoice_write(import_supplier_state $state): bool
  * Processes one csv line of a supplier invoice. The invoice being collected is held in $state,
  * it is written as soon as the document reference changes. Returns true when the line had an error.
  */
-function import_supplier_invoice_line(import_supplier_line $row, int $line, import_supplier_state $state): bool
+function import_supplier_invoice_line(import_supplier_line $row, int $line, import_supplier_state $state, import_attachment_library $library): bool
 {
 	/** @var references $Refs */
 	global $Refs;
@@ -216,7 +229,7 @@ function import_supplier_invoice_line(import_supplier_line $row, int $line, impo
 
 	// write the previous invoice before resolving the new auto-reference, so that
 	// get_next() sees the just-written reference and the sequence advances
-	if ($new_invoice && !import_supplier_invoice_write($state)) {
+	if ($new_invoice && !import_supplier_invoice_write($state, $library)) {
 		return true;
 	}
 
@@ -242,6 +255,11 @@ function import_supplier_invoice_line(import_supplier_line $row, int $line, impo
 	$state->cart->reference = $reference;
 
 	import_supplier_invoice_add_line($state->cart, $row);
+
+	// the document of the invoice is named in the attachment column of one of its lines
+	if ($state->attachment === '' && $row->attachment !== '') {
+		$state->attachment = trim($row->attachment);
+	}
 
 	return false;
 }

@@ -207,6 +207,7 @@ function show_table_section_sales_notes(): void
     label_row(_("7. Ensure that you have a delivery address completed."),"",'colspan=1');
     label_row(_("8. Sales orders and delivery notes are automatically created if 'Direct Sales Invoice Processing' is selected."),"",'colspan=1');
     label_row(_("9. If the Payment id column has a value of 4 in it, ie. Cash Only,  this will automatically allocate a Customer Payment to the invoice from the Petty Cash Account."),"",'colspan=1');
+    label_row(_("10. The 'attachment' column of the csv file holds the name of the document that is attached to the invoice, eg. 'invoice.pdf'. The document is uploaded with the csv file or carried by a zip file that has the name of the csv file with the .zip extension."),"",'colspan=1');
 }
 
 function show_table_section_supplier_invoice_notes(): void
@@ -220,6 +221,7 @@ function show_table_section_supplier_invoice_notes(): void
     label_row(_("6. The tax is calculated from the tax group of the supplier and the tax type of the item."),"",'colspan=1');
     label_row(_("7. Ensure that your item_code, eg. 001, for Services in your spreadsheet has a 'Text' column format otherwise you will lose your leading zeros when saving your to csv."),"",'colspan=1');
     label_row(_("8. Ensure that your csv file date format includes a 4 number year ie. YYYY, and it complies with your User selected date format."),"",'colspan=1');
+    label_row(_("9. The 'attachment' column of the csv file holds the name of the document that is attached to the invoice, eg. 'invoice.pdf'. The document is uploaded with the csv file or carried by a zip file that has the name of the csv file with the .zip extension."),"",'colspan=1');
 }
 
 function show_table_section_sales(): void
@@ -252,6 +254,16 @@ function show_table_section_trial_or_final(): void
     $_POST['trial'] = '1'; // always offer a trial run first
     check_row(_("Trial-run before importing. Do NOT process into database."), 'trial', '1', false, "");
     label_row(_("Import File:"), "<input type='file' id='imp' name='imp'>",'colspan=1');
+}
+
+/**
+ * The documents that are attached to the imported invoices.
+ */
+function show_table_section_attachments(): void
+{
+    table_section_title(_("Attachments"),2);
+    label_row(_("Document Files:"), "<input type='file' id='att' name='att[]' multiple>",'colspan=1');
+    label_row(_("The name of the document of an invoice is in the 'attachment' column of the csv file. The document is either uploaded here or carried by a zip file that has the name of the csv file with the .zip extension."), "", 'colspan=1');
 }
 
 function show_table_section_bankstatement_checkbox(): void

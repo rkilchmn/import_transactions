@@ -21,4 +21,6 @@ include_once(__DIR__ . "/../../../sales/includes/cart_class.inc");
  */
 final class import_sales_cart extends Cart
 {
+	/** the name of the document that is attached to the invoice */
+	public string $attachment = '';
 }
