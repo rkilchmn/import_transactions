@@ -407,11 +407,54 @@ function import_process_lines($fp, int $type, string $sep, bool $stateformat, st
  */
 function import_process_upload(int $type): void
 {
-    $filename = isset($_FILES['imp']['tmp_name']) ? $_FILES['imp']['tmp_name'] : '';
-    if (import_file_name() == '' || $filename == '')
-    {
+    // the uploaded files: one csv, and optionally a zip or individual pdfs
+    $csv_file = null;
+    $zip_file = null;
+    $pdf_files = [];
+
+    if (isset($_FILES['files'])) {
+        $files = $_FILES['files'];
+        if (!is_array($files['name'] ?? null)) {
+            $files = array(
+                'name' => array($files['name'] ?? ''),
+                'tmp_name' => array($files['tmp_name'] ?? ''),
+                'size' => array($files['size'] ?? 0),
+                'type' => array($files['type'] ?? ''),
+                'error' => array($files['error'] ?? UPLOAD_ERR_NO_FILE),
+            );
+        }
+        foreach ($files['name'] as $index => $name) {
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if ($ext === 'csv') {
+                $csv_file = array(
+                    'tmp_name' => $files['tmp_name'][$index],
+                    'name' => $name,
+                    'size' => $files['size'][$index] ?? 0,
+                    'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                );
+            } elseif ($ext === 'zip') {
+                $zip_file = array(
+                    'tmp_name' => $files['tmp_name'][$index],
+                    'name' => $name,
+                    'size' => $files['size'][$index] ?? 0,
+                    'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                );
+            } elseif ($ext === 'pdf') {
+                $pdf_files[] = array(
+                    'tmp_name' => $files['tmp_name'][$index],
+                    'name' => $name,
+                    'size' => $files['size'][$index] ?? 0,
+                    'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                );
+            }
+        }
+    }
+
+    if ($csv_file === null || $csv_file['tmp_name'] === '' || $csv_file['error'] !== UPLOAD_ERR_OK) {
         return;
     }
+    $filename = $csv_file['tmp_name'];
+    $csv_name = $csv_file['name'];
     $stateformat = ($type > 0) && isset($_POST['stateformat']);
     $sep = import_post('sep');
     $bank_account = import_post('bank_account');
@@ -438,6 +481,33 @@ function import_process_upload(int $type): void
     }
     $trial_text = import_post('trial');
     $trial = $trial_text !== '' && $trial_text !== '0';
+
+    // the documents that are attached to the imported transactions, they are either uploaded one
+    // by one or carried by the zip file that has the name of the csv file with the .zip extension
+    // populate the legacy $_FILES['att'] for the attachment library
+    if ($zip_file !== null || $pdf_files !== []) {
+        $_FILES['att'] = array(
+            'name' => array(),
+            'tmp_name' => array(),
+            'size' => array(),
+            'type' => array(),
+            'error' => array(),
+        );
+        if ($zip_file !== null) {
+            $_FILES['att']['name'][] = $zip_file['name'];
+            $_FILES['att']['tmp_name'][] = $zip_file['tmp_name'];
+            $_FILES['att']['size'][] = $zip_file['size'];
+            $_FILES['att']['type'][] = $zip_file['type'] ?? 'application/zip';
+            $_FILES['att']['error'][] = $zip_file['error'];
+        }
+        foreach ($pdf_files as $pdf) {
+            $_FILES['att']['name'][] = $pdf['name'];
+            $_FILES['att']['tmp_name'][] = $pdf['tmp_name'];
+            $_FILES['att']['size'][] = $pdf['size'];
+            $_FILES['att']['type'][] = $pdf['type'] ?? 'application/pdf';
+            $_FILES['att']['error'][] = $pdf['error'];
+        }
+    }
 
     // the documents that are attached to the imported transactions, they are either uploaded one
     // by one or carried by the zip file that has the name of the csv file with the .zip extension
@@ -539,13 +609,9 @@ function import_transactions_page(): void
     }
     show_table_section_csv_separator();
     show_table_section_trial_or_final();
-    if (in_array($type, array(ST_SUPPINVOICE, ST_SALESINVOICE, ST_SALESORDER), true)) {
-        // only the documents of the invoice imports are attached to the transactions
-        show_table_section_attachments();
-    }
     end_table(1);
     div_end('_main_table');
-    submit_center('import', "Process", true, false, true, ICON_OK);
+    submit_center('import', "Process", true, false, false, ICON_OK);
     end_form();
     end_page();
 }

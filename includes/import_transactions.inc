@@ -5,8 +5,21 @@ include_once(__DIR__ . "/import_rows.inc");
 /**
  * Name of the uploaded csv file, for the messages.
  */
+/**
+ * The name of the uploaded csv file.
+ */
 function import_file_name(): string
 {
+    if (isset($_FILES['files']['name'])) {
+        $names = $_FILES['files']['name'];
+        if (is_array($names)) {
+            foreach ($names as $name) {
+                if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'csv') {
+                    return $name;
+                }
+            }
+        }
+    }
     return isset($_FILES['imp']['name']) ? $_FILES['imp']['name'] : '';
 }
 

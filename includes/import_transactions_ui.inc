@@ -253,17 +253,8 @@ function show_table_section_trial_or_final(): void
     table_section_title(_("Trial-run (tick) or Final-run (no tick)"),2);
     $_POST['trial'] = '1'; // always offer a trial run first
     check_row(_("Trial-run before importing. Do NOT process into database."), 'trial', '1', false, "");
-    label_row(_("Import File:"), "<input type='file' id='imp' name='imp'>",'colspan=1');
-}
-
-/**
- * The documents that are attached to the imported invoices.
- */
-function show_table_section_attachments(): void
-{
-    table_section_title(_("Attachments"),2);
-    label_row(_("Document Files:"), "<input type='file' id='att' name='att[]' multiple>",'colspan=1');
-    label_row(_("The name of the document of an invoice is in the 'attachment' column of the csv file. The document is either uploaded here or carried by a zip file that has the name of the csv file with the .zip extension."), "", 'colspan=1');
+    label_row(_("Import Files (csv + optional zip/pdf):"), "<input type='file' id='files' name='files[]' multiple>",'colspan=1');
+    label_row(_("If using a zip, it must have the same base name as the csv file (e.g. 'invoices.csv' + 'invoices.zip')."), "", 'colspan=1');
 }
 
 function show_table_section_bankstatement_checkbox(): void

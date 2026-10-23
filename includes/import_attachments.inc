@@ -137,7 +137,7 @@ final class import_attachment_library
 				continue;
 			}
 			// the zip file that carries the documents of the import has the name of the csv file
-			if (strtolower($name) === $csv_base . '.zip') {
+			if (strcasecmp($name, $csv_base . '.zip') === 0) {
 				$this->open_zip($tmp_name, $name);
 				continue;
 			}
