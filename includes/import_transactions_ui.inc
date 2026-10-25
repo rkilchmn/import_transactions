@@ -16,7 +16,7 @@ function import_post_selected(string $key): ?string
 /**
  * @param string|array<int, string> $label a heading, or a list of lines shown as bullets
  */
-function checkbox_row($label, string $name, string $value, bool $submit_on_change, string $title, string $params = ""): void //adapted from check_row to accomodate colspan
+function checkbox_row($label, string $name, string $value, string $title, ?bool $submit_on_change = false, string $params = ""): void //adapted from check_row to accomodate colspan
 {
     if (is_array($label))
     {
@@ -120,15 +120,11 @@ function show_table_section_display(int $type): void
     table_section_title(_("Display"),2);
     if ($type == ST_SALESORDER || $type == ST_SALESINVOICE)
     {
-        checkbox_row(_("Lookup id's for Payment terms relating to Sales Orders / Invoices "), 'salestools', import_post('salestools'), true, "", 'colspan=1');
-        if (import_post('salestools') !== '') {show_table_section_sales();} else $Ajax->activate('_page_body');
+        checkbox_row(_("Lookup id's for Payment terms relating to Sales Orders / Invoices "), 'salestools', import_post('salestools'), "", true, 'colspan=1');        if (import_post('salestools') !== '') {show_table_section_sales();} else $Ajax->activate('_page_body');
     }
-    checkbox_row(_("Lookup id's for Tax Type, Customers, and Suppliers"), 'tools', import_post('tools'), true, "", 'colspan=1');
-    if (import_post('tools') !== '') {show_table_section_tools();} else $Ajax->activate('_page_body');
-    checkbox_row(_("Display Company Settings Lookup"), 'lookup', import_post('lookup'), true, "", 'colspan=1');
-    if (import_post('lookup') !== '') {show_table_section_company_settings_lookup();} else $Ajax->activate('_page_body');
-    checkbox_row(_("Display Help Notes"), 'notes', import_post('notes'), true, "", 'colspan=1');
-    if (import_post('notes') !== '') {show_table_section_notes($type);} else $Ajax->activate('_page_body');
+    checkbox_row(_("Lookup id's for Tax Type, Customers, and Suppliers"), 'tools', import_post('tools'), true, "", 'colspan=1');    if (import_post('tools') !== '') {show_table_section_tools();} else $Ajax->activate('_page_body');
+    checkbox_row(_("Display Company Settings Lookup"), 'lookup', import_post('lookup'), true, "", 'colspan=1');    if (import_post('lookup') !== '') {show_table_section_company_settings_lookup();} else $Ajax->activate('_page_body');
+    checkbox_row(_("Display Help Notes"), 'notes', import_post('notes'), true, "", 'colspan=1');    if (import_post('notes') !== '') {show_table_section_notes($type);} else $Ajax->activate('_page_body');
 }
 
 /**
@@ -227,8 +223,7 @@ function show_table_section_supplier_invoice_notes(): void
 function show_table_section_sales(): void
 {
     table_section_title(_("Lookup: Orders / Invoices"),2);
-    checkbox_row(_("Cash Only (no tick)/Credit Sales (tick)"), 'cashorcredit', import_post('cashorcredit'), true, "", 'colspan=1');
-    $paymcat = import_post('cashorcredit') !== '' ? PM_CREDIT : PM_CASH;
+    checkbox_row(_("Cash Only (no tick)/Credit Sales (tick)"), 'cashorcredit', import_post('cashorcredit'), true, "", 'colspan=1');    $paymcat = import_post('cashorcredit') !== '' ? PM_CREDIT : PM_CASH;
     echo "<tr class='evenrow'>";sale_payment_list_cells(_("Payment terms:"), 'payment', $paymcat, null, true);echo "</tr>";
     echo "<tr class='oddrow'>";label_cell(_("Payment id: (Use this in the template provided under 'Display Help Notes'"),'colspan=1');label_cell(import_post('payment'),'colspan=1 align=right width=20px');echo "</tr>";
     table_section_title("");
@@ -270,5 +265,4 @@ function show_table_section_bankstatement_checkbox(): void
                     _("You will need to process bank.csv twice. Once with 'Payment Processing', next with 'Deposit Processing'"),
                     _("Template <a href='./templates/bank_en_GB.csv'>bank_en_GB.csv</a>."));
     table_section_title(_("Bank Statement Format"),2);
-    checkbox_row($bs, 'stateformat', import_post('stateformat'), false, "", 'colspan=1 wrap align=left');
-}
+    checkbox_row($bs, 'stateformat', import_post('stateformat'), false, "", 'colspan=1 wrap align=left');}
